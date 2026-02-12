@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# get directory of the script
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )/.." && pwd )"
+
+# generate unique devbox id based on the current directory
+export DEVBOX_ID=devbox-$(echo $PWD|shasum|awk '{print $1}'|cut -c1-8)
+export PROJECT_DIR=$PWD
+export PROJECT_KEY=$DEVBOX_ID
+JUST_ARGS="--working-directory $DIR --justfile $DIR/Justfile"
+
+cmd=$1
+
+if [ -z "$cmd" ]; then
+  just $JUST_ARGS list|grep "$DEVBOX_ID" > /dev/null
+
+  if [ $? -ne 0 ]; then
+    echo -n "=> No devbox found for this directory. Want to create one? (y/n): "
+    read answer
+    if [ "$answer" != "y" ]; then
+      echo "Aborting."
+      exit 1
+    fi
+
+    just $JUST_ARGS build
+  fi
+
+  cmd="shell"
+fi
+
+just --working-directory $DIR --justfile $DIR/Justfile $cmd

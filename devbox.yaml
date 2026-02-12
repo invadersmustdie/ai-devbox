@@ -1,0 +1,150 @@
+vmType: "vz"
+cpus: 2
+memory: "2GiB"
+disk: "10GiB"
+
+mountType: "virtiofs"
+
+base:
+  - template:_images/debian-13
+
+param:
+  PROJECT_DIR: "REPLACE_ME"
+  PROJECT_KEY: "REPLACE_ME"
+
+mounts:
+  - location: "{{.Param.PROJECT_DIR}}"
+    mountPoint: "{{.Home}}/project"
+    writable: true
+  - location: "~/.local/state/devbox/cache/base-{{.Param.PROJECT_KEY}}"
+    mountPoint: "{{.Home}}/.cache"
+    writable: true
+  - location: "~/.local/state/devbox/cache/apt-cache-{{.Param.PROJECT_KEY}}"
+    mountPoint: "/var/cache/apt/archives"
+    writable: true
+
+containerd:
+  system: false
+  user: false
+
+provision:
+# environment variables for cache optimization
+  - mode: data
+    path: /etc/profile.d/devenv.sh
+    content: |
+      # caching + path setup for mise
+      export PATH={{.Home}}/.mise-data/shims:{{.Home}}/.bin:$PATH
+      export MISE_DATA_DIR={{.Home}}/.mise-data
+      export MISE_CACHE_DIR={{.Home}}/.cache/mise-cache
+      # when using gradle
+      export GRADLE_USER_HOME={{.Home}}/.cache/gradle
+      export ORG_GRADLE_PROJECT_buildDir={{.Home}}/build
+    owner: "root:root"
+    permissions: 644
+# prerequisite packages
+  - mode: system
+    script: |
+      #!/bin/bash
+      apt-get update -y
+      apt-get install -y curl gpg git net-tools jq
+# mise for tools
+  - mode: system
+    script: |
+      #!/bin/bash
+      install -dm 755 /etc/apt/keyrings
+      curl -fsSL https://mise.jdx.dev/gpg-key.pub | gpg --dearmor -o /etc/apt/keyrings/mise-archive-keyring.gpg
+      echo "deb [signed-by=/etc/apt/keyrings/mise-archive-keyring.gpg arch=$(dpkg --print-architecture)] https://mise.jdx.dev/deb stable main" > /etc/apt/sources.list.d/mise.list
+      apt update -y
+      apt install -y mise
+## set defaults for git
+  - mode: user
+    script: |
+      #!/bin/bash
+      git config --global user.name "Dev Box ({{.User}})"
+      git config --global user.email "devbox@local"
+# install tools
+  - mode: user
+    script: |
+      #!/bin/bash
+      mise trust -y
+      tools=(
+        uv
+        node
+        claude
+        opencode
+        gemini-cli
+      )
+      for tool in "${tools[@]}"; do
+        mise install $tool && mise use -g $tool@latest
+      done
+  - mode: user
+    script: |
+      #!/bin/bash
+      cd {{.Home}}/project
+      mise trust -y
+  - mode: data
+    path: "{{.Home}}/.bash_profile"
+    content: |
+      if [ ! -f /tmp/.${USER}-login ]; then
+        echo ""
+        echo ">> Welcome to devbox"
+        echo ""
+      
+        touch /tmp/.${USER}-login
+      fi
+    owner: "{{.User}}:{{.User}}"
+    permissions: 644
+  - mode: data
+    path: "{{.Home}}/.bin/xdg-open"
+    content: |
+      #!/bin/bash
+      echo "[xdg-open] Opening file: $1"
+      exit 0
+    owner: "{{.User}}:{{.User}}"
+    permissions: 700
+  - mode: data
+    path: "/etc/claude-code/managed-settings.json"
+    content: |
+      {
+        "$schema": "https://json.schemastore.org/claude-code-settings.json",
+        "permissions": {
+          "deny": [
+            "Read(./.env)",
+            "Read(./.env.*)",
+            "Read(./secrets/**)"
+          ]
+        },
+        "model": "claude-haiku-4-5",
+        "env": {
+          "CLAUDE_CODE_ENABLE_TELEMETRY": "0"
+        },
+        "companyAnnouncements": [
+          "Welcome to claude. With great power comes great responsibility."
+        ]
+      }
+    owner: "root:root"
+    permissions: 644
+  - mode: data
+    path: "{{.Home}}/.config/opencode/opencode.json"
+    content: |
+      {
+        "$schema": "https://opencode.ai/config.json",
+        "share": "disabled",
+        "autoupdate": true,
+        "permission": {
+          "read": {
+            "*": "allow",
+            "*.env": "deny",
+            "*.env.*": "deny",
+            "*.env.example": "allow"
+          }
+        }
+      }
+    owner: "{{.User}}:{{.User}}"
+    permissions: 600
+
+message: |
+    -------------------------------
+    >> devbox created successfully!
+    >> run "just shell" to enter
+    -------------------------------
