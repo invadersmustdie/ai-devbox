@@ -112,6 +112,7 @@ provision:
             "Read(./.env)",
             "Read(./.env.*)",
             "Read(./secrets/**)"
+            "Read(./.idea/**)"
           ]
         },
         "model": "claude-haiku-4-5",
@@ -136,7 +137,8 @@ provision:
             "*": "allow",
             "*.env": "deny",
             "*.env.*": "deny",
-            "*.env.example": "allow"
+            "*.env.example": "allow",
+            ".idea/**": "deny"
           }
         }
       }
