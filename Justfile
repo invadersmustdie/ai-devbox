@@ -30,7 +30,7 @@ restart:
     @just start
 
 [private]
-create:
+create: mk-cache-dirs
     @echo ""
     @echo "> Creating VM with name: {{name}}"
     @echo "> - Using project directory: {{project_dir}}"
