@@ -103,6 +103,21 @@ provision:
     owner: "{{.User}}:{{.User}}"
     permissions: 700
   - mode: data
+    path: "{{.Home}}/.bin/update-agents"
+    content: |
+      #!/bin/bash
+      mise trust -y
+      tools=(
+        claude
+        opencode
+        gemini-cli
+      )
+      for tool in "${tools[@]}"; do
+        mise install $tool
+      done
+    owner: "{{.User}}:{{.User}}"
+    permissions: 700
+  - mode: data
     path: "/etc/claude-code/managed-settings.json"
     content: |
       {
